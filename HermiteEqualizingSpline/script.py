@@ -23,6 +23,7 @@ yp=list(map(float, yp.split(' ')))
 xs=list(map(float, xs.split(' ')))
 ys=list(map(float, ys.split(' ')))
 
+plt.plot(xp, yp, 'bo')
 plt.plot(xp, yp, 'b', label='line')
 plt.plot(xs, ys, 'r', label='spline')
 
