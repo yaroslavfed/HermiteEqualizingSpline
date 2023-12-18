@@ -172,7 +172,7 @@ internal class Program
             double result = 0;
             for (int k = 0; k < list.Count; k++)
             {
-                result += weight * list[i].Y * GetBasicFunctions(i,
+                result += weight * list[k].Y * GetBasicFunctions(i,
                     list[k].X, list.FirstOrDefault()!.X,
                     list.LastOrDefault()!.X - list.FirstOrDefault()!.X);
             }
