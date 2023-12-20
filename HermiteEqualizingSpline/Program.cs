@@ -66,7 +66,6 @@ internal class Program
         return data.Nodes;
     }
 
-    // TODO: неправильно считается q
     static Area ResolveSpline()
     {
         var A = GetAMatrix();
@@ -226,7 +225,6 @@ internal class Program
         double[] x = new double[N];
         double R;
 
-        // Прямой ход
         for (int q = 0; q < N; q++)
         {
             R = 1 / B[q][q];
@@ -244,7 +242,6 @@ internal class Program
             }
         }
 
-        // Обратный ход
         for (int q = N - 1; q >= 0; q--)
         {
             R = RightPart[q];
