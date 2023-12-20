@@ -1,6 +1,5 @@
 ﻿using System.Text.Json;
 using System.Diagnostics;
-using System.Threading.Channels;
 using static System.Math;
 
 namespace HermiteEqualizingSpline;
@@ -15,7 +14,10 @@ internal class Program
     private static Area s_outputData = new();
 
     private static readonly double s_weight = 1;
-    private static readonly int s_finiteElementsCount = 5;
+    private static readonly double s_alfa = 0;
+    private static readonly double s_betta = 0.001;
+
+    private static readonly int s_finiteElementsCount = 1;
 
     #endregion
 
@@ -39,7 +41,7 @@ internal class Program
         var nodesRange = Math.Ceiling((double)nodesList.Count / (double)s_finiteElementsCount);
 
         var elements = new List<FiniteElement>();
-        for (int i = 0; i < nodesList.Count; i += (int)nodesRange-1)
+        for (int i = 0; i < nodesList.Count; i += (int)nodesRange - 1)
         {
             var temp = nodesList.Skip(i).Take((int)nodesRange).ToList();
             var element = new FiniteElement
@@ -51,7 +53,7 @@ internal class Program
 
         return new Area
         {
-            Elements = elements
+            Elements = elements.SkipLast(1).ToList()
         };
     }
 
@@ -71,12 +73,6 @@ internal class Program
         var b = GetBVector();
 
         var q = Gauss(A.Count, A, b);
-
-        q = new()
-        {
-            10.01, -0.228, 9.885, -0.085, 7.811, -8.826, 3.348, -8.923, 1.076, -0.434, 0.939, -0.129
-        };
-
         var S = GetSpline(q);
 
 
@@ -98,7 +94,6 @@ internal class Program
     {
         IList<Node> result = new List<Node>();
         var elementsCount = s_inputData.Elements.Count;
-        var subCount = q.Count / elementsCount;
 
         for (var index = 0; index < elementsCount; index++)
         {
@@ -110,8 +105,8 @@ internal class Program
             for (var i = firstItem; i < lastItem; i += 0.01)
             {
                 double item = 0;
-                var splitP = q.Skip(subIndex).Take(elementsCount).ToArray();
-                for (int j = 0; j < splitP.Length; j++)
+                var splitP = q.Skip(subIndex).Take(2 * (elementsCount + 1)).ToList();
+                for (int j = 0; j < splitP.Count; j++)
                 {
                     item += splitP[j]
                             * GetBasicFunctions(
@@ -131,14 +126,14 @@ internal class Program
     static IList<IList<double>> GetAMatrix()
     {
         var iList = new List<IList<double>>();
-        for (int i = 0; i < 2 * s_inputData.Elements.Count; i++)
+        for (int i = 0; i < 2 * (s_inputData.Elements.Count + 1); i++)
         {
             var jList = new List<double>();
-            for (int j = 0; j < 2 * s_inputData.Elements.Count; j++)
+            for (int j = 0; j < 2 * (s_inputData.Elements.Count + 1); j++)
             {
-                double result = 0;
                 foreach (var element in s_inputData.Elements)
                 {
+                    double result = 0;
                     foreach (var node in element.Nodes)
                     {
                         result += s_weight
@@ -147,11 +142,13 @@ internal class Program
                                       element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
                                   * GetBasicFunctions(j,
                                       node.X, element.Nodes.FirstOrDefault()!.X,
-                                      element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X);
+                                      element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
+                                  + SupplementAlfa(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j]
+                                  + SupplementBetta(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j];
                     }
-                }
 
-                jList.Add(result);
+                    jList.Add(result);
+                }
             }
 
             iList.Add(jList);
@@ -160,34 +157,65 @@ internal class Program
         return iList;
     }
 
-    //static double SupplementAlfa()
-    //{
+    static IList<IList<double>> SupplementAlfa(double h)
+    {
+        var matrix = new List<IList<double>>
+        {
+            new List<double> { 36, 3 * h, -36, 3 * h },
+            new List<double> { 3 * h, 4 * Pow(h, 2), -3 * h, -1 * Pow(h, 2) },
+            new List<double> { -36, -3 * h, 36, -3 * h },
+            new List<double> { 3 * h, -1 * Pow(h, 2), -3 * h, 4 * Pow(h, 2) }
+        };
 
-    //}    
+        foreach (var line in matrix)
+        {
+            for (var i = 0; i < line.Count; i++)
+            {
+                line[i] *= s_alfa / (30 * h);
+            }
+        }
 
-    //static double SupplementBetta()
-    //{
+        return matrix;
+    }
 
-    //}
+    static IList<IList<double>> SupplementBetta(double h)
+    {
+        var matrix = new List<IList<double>>
+        {
+            new List<double> { 60, 30 * h, -60, 30 * h },
+            new List<double> { 30 * h, 16 * Pow(h, 2), -30 * h, 14 * Pow(h, 2) },
+            new List<double> { -60, -30 * h, 60, -30 * h },
+            new List<double> { 30 * h, 14 * Pow(h, 2), -30 * h, 16 * Pow(h, 2) }
+        };
+
+        foreach (var line in matrix)
+        {
+            for (var i = 0; i < line.Count; i++)
+            {
+                line[i] *= s_betta / Pow(h, 3);
+            }
+        }
+
+        return matrix;
+    }
 
     static IList<double> GetBVector()
     {
         var fList = new List<double>();
-
-        for (int i = 0; i < 2 * s_inputData.Elements.Count; i++)
+        foreach (var element in s_inputData.Elements)
         {
-            double result = 0;
-            foreach (var element in s_inputData.Elements)
+            for (int i = 0; i < 2 * (s_inputData.Elements.Count + 1); i++)
             {
+                double result = 0;
                 foreach (var node in element.Nodes)
                 {
                     result += s_weight * node.Y * GetBasicFunctions(i,
                         node.X, element.Nodes.FirstOrDefault()!.X,
                         element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X);
                 }
-            }
 
-            fList.Add(result);
+                fList.Add(result);
+            }
         }
 
         return fList;
