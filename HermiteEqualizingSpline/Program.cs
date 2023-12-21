@@ -141,11 +141,11 @@ internal class Program
                                       element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
                                   * GetBasicFunctions(j,
                                       node.X, element.Nodes.FirstOrDefault()!.X,
-                                      element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
-                                  + SupplementAlfa(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j]
-                                  + SupplementBetta(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j];
+                                      element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X);
                     }
-
+                    result += SupplementAlfa(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j]
+                                + SupplementBetta(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j];
+                    
                     jList.Add(result);
                 }
             }
