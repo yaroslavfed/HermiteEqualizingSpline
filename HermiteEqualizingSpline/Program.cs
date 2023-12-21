@@ -69,6 +69,8 @@ internal class Program
     static Area ResolveSpline()
     {
         var A = GetAMatrix();
+
+        //TODO: переписать рассчёт вектора b (сейчас считает только для одного конечного элемента)
         var b = GetBVector();
 
         var q = Gauss(A.Count, A, b);
@@ -103,17 +105,8 @@ internal class Program
             var lastItem = element.Nodes.LastOrDefault()!.X;
             for (var i = firstItem; i < lastItem; i += 0.01)
             {
-                double item = 0;
-                var splitP = q.Skip(subIndex).Take(2 * (elementsCount + 1)).ToList();
-                for (int j = 0; j < splitP.Count; j++)
-                {
-                    item += splitP[j]
-                            * GetBasicFunctions(
-                                j,
-                                i,
-                                firstItem,
-                                lastItem - firstItem);
-                }
+                var splitQ = q.Skip(subIndex).Take(2 * (elementsCount + 1)).ToList();
+                var item = splitQ.Select((sq, j) => sq * GetBasicFunctions(j, i, firstItem, lastItem - firstItem)).Sum();
 
                 result.Add(new Node { X = i, Y = item });
             }
@@ -155,11 +148,12 @@ internal class Program
             {
                 globalMatrixLine.Add(globalMatrixArray[i, j]);
             }
+
             globalMatrixList.Add(globalMatrixLine);
         }
 
         Console.WriteLine(new Matrix(globalMatrixList));
-        
+
         return globalMatrixList;
     }
 
@@ -174,17 +168,19 @@ internal class Program
                 var line = new List<double>();
                 for (int j = 0; j < 4; j++)
                 {
-                    double result = 0;
-                    foreach (var node in element.Nodes)
-                    {
-                        result += s_weight
-                                  * GetBasicFunctions(i,
-                                      node.X, element.Nodes.FirstOrDefault()!.X,
-                                      element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
-                                  * GetBasicFunctions(j,
-                                      node.X, element.Nodes.FirstOrDefault()!.X,
-                                      element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X);
-                    }
+                    var result = element.Nodes.Sum(node =>
+                        s_weight
+                        * GetBasicFunctions(
+                            i,
+                            node.X,
+                            element.Nodes.FirstOrDefault()!.X,
+                            element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
+                        * GetBasicFunctions(
+                            j,
+                            node.X,
+                            element.Nodes.FirstOrDefault()!.X,
+                            element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
+                    );
 
                     result += SupplementAlfa(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j]
                               + SupplementBetta(element.Nodes.LastOrDefault()!.X -
@@ -251,13 +247,15 @@ internal class Program
         {
             for (int i = 0; i < 2 * (s_inputData.Elements.Count + 1); i++)
             {
-                double result = 0;
-                foreach (var node in element.Nodes)
-                {
-                    result += s_weight * node.Y * GetBasicFunctions(i,
-                        node.X, element.Nodes.FirstOrDefault()!.X,
-                        element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X);
-                }
+                double result = element.Nodes.Sum(node =>
+                    s_weight
+                    * node.Y
+                    * GetBasicFunctions(
+                        i,
+                        node.X,
+                        element.Nodes.FirstOrDefault()!.X,
+                        element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
+                );
 
                 fList.Add(result);
             }
@@ -266,34 +264,34 @@ internal class Program
         return fList;
     }
 
-    static List<double> Gauss(int N, IList<IList<double>> B, IList<double> RightPart)
+    static List<double> Gauss(int n, IList<IList<double>> a, IList<double> b)
     {
-        double[] x = new double[N];
-        double R;
+        double[] x = new double[n];
+        double r;
 
-        for (int q = 0; q < N; q++)
+        for (int q = 0; q < n; q++)
         {
-            R = 1 / B[q][q];
-            B[q][q] = 1;
-            for (int j = q + 1; j < N; j++)
-                B[q][j] *= R;
-            RightPart[q] *= R;
-            for (int k = q + 1; k < N; k++)
+            r = 1 / a[q][q];
+            a[q][q] = 1;
+            for (int j = q + 1; j < n; j++)
+                a[q][j] *= r;
+            b[q] *= r;
+            for (int k = q + 1; k < n; k++)
             {
-                R = B[k][q];
-                B[k][q] = 0;
-                for (int j = q + 1; j < N; j++)
-                    B[k][j] = B[k][j] - B[q][j] * R;
-                RightPart[k] -= RightPart[q] * R;
+                r = a[k][q];
+                a[k][q] = 0;
+                for (int j = q + 1; j < n; j++)
+                    a[k][j] = a[k][j] - a[q][j] * r;
+                b[k] -= b[q] * r;
             }
         }
 
-        for (int q = N - 1; q >= 0; q--)
+        for (int q = n - 1; q >= 0; q--)
         {
-            R = RightPart[q];
-            for (int j = q + 1; j < N; j++)
-                R -= B[q][j] * x[j];
-            x[q] = R;
+            r = b[q];
+            for (int j = q + 1; j < n; j++)
+                r -= a[q][j] * x[j];
+            x[q] = r;
         }
 
         return x.ToList();
@@ -315,7 +313,7 @@ internal class Program
 
     static void DrawPlot()
     {
-        using Process myProcess = new Process();
+        using var myProcess = new Process();
         myProcess.StartInfo.FileName = "python";
         myProcess.StartInfo.Arguments = @"script.py";
         myProcess.StartInfo.UseShellExecute = false;
@@ -323,8 +321,8 @@ internal class Program
         myProcess.StartInfo.RedirectStandardOutput = false;
         myProcess.Start();
 
-        string outputPath = Path.Combine(Directory.GetCurrentDirectory(), "Output.txt");
-        using StreamWriter sw = new StreamWriter(outputPath);
+        var outputPath = Path.Combine(Directory.GetCurrentDirectory(), "Output.txt");
+        using var sw = new StreamWriter(outputPath);
 
         foreach (var element in s_inputData.Elements)
         {
