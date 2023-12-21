@@ -15,9 +15,9 @@ internal class Program
 
     private static readonly double s_weight = 1;
     private static readonly double s_alfa = 0;
-    private static readonly double s_betta = 0.001;
+    private static readonly double s_betta = 0.01;
 
-    private static readonly int s_finiteElementsCount = 1;
+    private static readonly int s_finiteElementsCount = 2;
 
     #endregion
 
@@ -124,13 +124,55 @@ internal class Program
 
     static IList<IList<double>> GetAMatrix()
     {
-        var iList = new List<IList<double>>();
-        for (int i = 0; i < 2 * (s_inputData.Elements.Count + 1); i++)
+        var matrixList = SetLocalMatrices();
+        var matrixSize = 2 * (s_inputData.Elements.Count + 1);
+
+        double[,] globalMatrixArray = new double[matrixSize, matrixSize];
+        for (int i = 0; i < matrixSize; i++)
         {
-            var jList = new List<double>();
-            for (int j = 0; j < 2 * (s_inputData.Elements.Count + 1); j++)
+            for (int j = 0; j < matrixSize; j++)
             {
-                foreach (var element in s_inputData.Elements)
+                globalMatrixArray[i, j] = 0;
+            }
+        }
+
+        for (int k = 0; k < matrixList.Count; k++)
+        {
+            for (int i = 0; i < matrixList[k].Count; i++)
+            {
+                for (int j = 0; j < matrixList[k][i].Count; j++)
+                {
+                    globalMatrixArray[i + (k * 2), j + (k * 2)] = matrixList[k][i][j];
+                }
+            }
+        }
+
+        var globalMatrixList = new List<IList<double>>();
+        for (int i = 0; i < matrixSize; i++)
+        {
+            var globalMatrixLine = new List<double>();
+            for (int j = 0; j < matrixSize; j++)
+            {
+                globalMatrixLine.Add(globalMatrixArray[i, j]);
+            }
+            globalMatrixList.Add(globalMatrixLine);
+        }
+
+        Console.WriteLine(new Matrix(globalMatrixList));
+        
+        return globalMatrixList;
+    }
+
+    static IList<IList<IList<double>>> SetLocalMatrices()
+    {
+        var matrixList = new List<IList<IList<double>>>();
+        foreach (var element in s_inputData.Elements)
+        {
+            var matrix = new List<IList<double>>(); // 2 * (s_inputData.Elements.Count + 1)
+            for (int i = 0; i < 4; i++)
+            {
+                var line = new List<double>();
+                for (int j = 0; j < 4; j++)
                 {
                     double result = 0;
                     foreach (var node in element.Nodes)
@@ -143,17 +185,21 @@ internal class Program
                                       node.X, element.Nodes.FirstOrDefault()!.X,
                                       element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X);
                     }
+
                     result += SupplementAlfa(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j]
-                                + SupplementBetta(element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)[i][j];
-                    
-                    jList.Add(result);
+                              + SupplementBetta(element.Nodes.LastOrDefault()!.X -
+                                                element.Nodes.FirstOrDefault()!.X)[i][j];
+
+                    line.Add(result);
                 }
+
+                matrix.Add(line);
             }
 
-            iList.Add(jList);
+            matrixList.Add(matrix);
         }
 
-        return iList;
+        return matrixList;
     }
 
     static IList<IList<double>> SupplementAlfa(double h)
