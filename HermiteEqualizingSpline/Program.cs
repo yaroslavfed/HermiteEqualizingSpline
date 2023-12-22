@@ -69,8 +69,6 @@ internal class Program
     static Area ResolveSpline()
     {
         var A = GetAMatrix();
-
-        //TODO: переписать рассчёт вектора b (сейчас считает только для одного конечного элемента)
         var b = GetBVector();
 
         var q = Gauss(A.Count, A, b);
@@ -106,7 +104,8 @@ internal class Program
             for (var i = firstItem; i < lastItem; i += 0.01)
             {
                 var splitQ = q.Skip(subIndex).Take(2 * (elementsCount + 1)).ToList();
-                var item = splitQ.Select((sq, j) => sq * GetBasicFunctions(j, i, firstItem, lastItem - firstItem)).Sum();
+                var item = splitQ.Select((sq, j) => sq * GetBasicFunctions(j, i, firstItem, lastItem - firstItem))
+                    .Sum();
 
                 result.Add(new Node { X = i, Y = item });
             }
@@ -135,7 +134,7 @@ internal class Program
             {
                 for (int j = 0; j < matrixList[k][i].Count; j++)
                 {
-                    globalMatrixArray[i + (k * 2), j + (k * 2)] = matrixList[k][i][j];
+                    globalMatrixArray[i + (k * 2), j + (k * 2)] += matrixList[k][i][j];
                 }
             }
         }
@@ -162,7 +161,7 @@ internal class Program
         var matrixList = new List<IList<IList<double>>>();
         foreach (var element in s_inputData.Elements)
         {
-            var matrix = new List<IList<double>>(); // 2 * (s_inputData.Elements.Count + 1)
+            var matrix = new List<IList<double>>();
             for (int i = 0; i < 4; i++)
             {
                 var line = new List<double>();
@@ -242,10 +241,44 @@ internal class Program
 
     static IList<double> GetBVector()
     {
-        var fList = new List<double>();
+        var vectorsList = SetLocalVector();
+        var vectorSize = 2 * (s_inputData.Elements.Count + 1);
+
+        double[] globalVectorArray = new double[vectorSize];
+        for (int i = 0; i < vectorSize; i++)
+        {
+            globalVectorArray[i] = 0;
+        }
+
+        for (int k = 0; k < vectorsList.Count; k++)
+        {
+            for (int i = 0; i < vectorsList[k].Count; i++)
+            {
+                globalVectorArray[i + (k * 2)] += vectorsList[k][i];
+            }
+        }
+
+        var globalVectorList = new List<double>();
+        for (int i = 0; i < vectorSize; i++)
+        {
+            globalVectorList.Add(globalVectorArray[i]);
+        }
+
+        foreach (var item in globalVectorList)
+        {
+            Console.Write($"{item} ");
+        }
+
+        return globalVectorList;
+    }
+
+    static IList<IList<double>> SetLocalVector()
+    {
+        var vectorsList = new List<IList<double>>();
         foreach (var element in s_inputData.Elements)
         {
-            for (int i = 0; i < 2 * (s_inputData.Elements.Count + 1); i++)
+            var vector = new List<double>();
+            for (int i = 0; i < 4; i++)
             {
                 double result = element.Nodes.Sum(node =>
                     s_weight
@@ -257,11 +290,13 @@ internal class Program
                         element.Nodes.LastOrDefault()!.X - element.Nodes.FirstOrDefault()!.X)
                 );
 
-                fList.Add(result);
+                vector.Add(result);
             }
+
+            vectorsList.Add(vector);
         }
 
-        return fList;
+        return vectorsList;
     }
 
     static List<double> Gauss(int n, IList<IList<double>> a, IList<double> b)
